@@ -5,26 +5,14 @@ import random
 SCREEN_WIDTH = 640
 SCREEN_HEIGHT = 480
 BLOCK_SIZE = 20
-MAZE = [
-    '####################',
-    '#..................#',
-    '#.####.#####.####.#',
-    '#.#  #.#   #.# #.#',
-    '#.#..#.###.#.##.#.#',
-    '#.#  #.#   #.#  #.#',
-    '#.####.#####.####.#',
-    '#..................#',
-    '####################'
-]
+GRID_WIDTH = SCREEN_WIDTH // BLOCK_SIZE
+GRID_HEIGHT = SCREEN_HEIGHT // BLOCK_SIZE
+DOT_SIZE = 5
+DOT_COLOR = (255, 255, 255)
+PACMAN_COLOR = (255, 255, 0)
+GHOST_COLOR = (255, 0, 0)
+PACMAN_SPEED = 2
 GHOST_SPEED = 3
-GHOST_COLORS = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
-GHOST_START_POSITIONS = [(SCREEN_WIDTH // 2 - BLOCK_SIZE, SCREEN_HEIGHT // 2 - BLOCK_SIZE),
-                         (SCREEN_WIDTH // 2 + BLOCK_SIZE, SCREEN_HEIGHT // 2 - BLOCK_SIZE),
-                         (SCREEN_WIDTH // 2 - BLOCK_SIZE, SCREEN_HEIGHT // 2 + BLOCK_SIZE),
-                         (SCREEN_WIDTH // 2 + BLOCK_SIZE, SCREEN_HEIGHT // 2 + BLOCK_SIZE)]
-PACMAN_SPEED = 5
-PACMAN_START_POSITION = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-PACMAN_START_DIRECTION = 'left'
 
 # Initialize Pygame
 pygame.init()
@@ -33,91 +21,52 @@ pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Ghost Pac-Man')
 
-# Set up the font
-font = pygame.font.SysFont('Arial', 20)
+# Create the grid with dots
+grid = [['.' for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
 
-# Define function for drawing the maze
-def draw_maze():
-    for y in range(len(MAZE)):
-        for x in range(len(MAZE[y])):
-            if MAZE[y][x] == '#':
-                pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE))
+# Place Pac-Man randomly on the grid
+pacman_position = (random.randint(0, GRID_WIDTH - 1), random.randint(0, GRID_HEIGHT - 1))
+grid[pacman_position[1]][pacman_position[0]] = 'P'
 
-# Define the Ghost class
-class Ghost:
-    def __init__(self, color, start_position):
-        self.color = color
-        self.rect = pygame.Rect(start_position[0], start_position[1], BLOCK_SIZE, BLOCK_SIZE)
-        self.direction = random.choice(['up', 'down', 'left', 'right'])
+# Place the ghost randomly on the grid
+ghost_position = (random.randint(0, GRID_WIDTH - 1), random.randint(0, GRID_HEIGHT - 1))
+while ghost_position == pacman_position:
+    ghost_position = (random.randint(0, GRID_WIDTH - 1), random.randint(0, GRID_HEIGHT - 1))
+grid[ghost_position[1]][ghost_position[0]] = 'G'
 
-    def update(self):
-        # Move the ghost in its current direction
-        if self.direction == 'up':
-            self.rect.y -= GHOST_SPEED
-        elif self.direction == 'down':
-            self.rect.y += GHOST_SPEED
-        elif self.direction == 'left':
-            self.rect.x -= GHOST_SPEED
-        elif self.direction == 'right':
-            self.rect.x += GHOST_SPEED
+def draw_grid():
+    for y in range(GRID_HEIGHT):
+        for x in range(GRID_WIDTH):
+            if grid[y][x] == '.':
+                pygame.draw.circle(screen, DOT_COLOR, (x * BLOCK_SIZE + BLOCK_SIZE // 2, y * BLOCK_SIZE + BLOCK_SIZE // 2), DOT_SIZE)
+            elif grid[y][x] == 'P':
+                pygame.draw.circle(screen, PACMAN_COLOR, (x * BLOCK_SIZE + BLOCK_SIZE // 2, y * BLOCK_SIZE + BLOCK_SIZE // 2), BLOCK_SIZE // 2)
+            elif grid[y][x] == 'G':
+                pygame.draw.rect(screen, GHOST_COLOR, pygame.Rect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE))
 
-        # Check for collisions with walls
-        if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH or self.rect.top < 0 or self.rect.bottom > SCREEN_HEIGHT:
-            self.direction = random.choice(['up', 'down', 'left', 'right'])
-        elif self.rect.left % BLOCK_SIZE == 0 and self.rect.top % BLOCK_SIZE == 0:
-            if self.rect.left // BLOCK_SIZE < 0 or self.rect.left // BLOCK_SIZE >= len(MAZE[0]) or self.rect.top // BLOCK_SIZE < 0 or self.rect.top // BLOCK_SIZE >= len(MAZE) or MAZE[self.rect.top // BLOCK_SIZE][self.rect.left // BLOCK_SIZE] == '#' or MAZE[self.rect.bottom // BLOCK_SIZE][self.rect.right // BLOCK_SIZE] == '#' or MAZE[self.rect.top // BLOCK_SIZE][self.rect.right // BLOCK_SIZE] == '#' or MAZE[self.rect.bottom // BLOCK_SIZE][self.rect.left // BLOCK_SIZE] == '#':
-                self.direction = random.choice(['up', 'down', 'left', 'right'])
+def move_pacman():
+    global pacman_position
+    directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+    random.shuffle(directions)
+    for dx, dy in directions:
+        new_x, new_y = pacman_position[0] + dx, pacman_position[1] + dy
+        if 0 <= new_x < GRID_WIDTH and 0 <= new_y < GRID_HEIGHT and grid[new_y][new_x] != 'G':
+            grid[pacman_position[1]][pacman_position[0]] = '.'
+            pacman_position = (new_x, new_y)
+            grid[new_y][new_x] = 'P'
+            break
 
-    def draw(self):
-        pygame.draw.rect(screen, self.color, self.rect)
+def move_ghost(direction):
+    global ghost_position
+    dx, dy = direction
+    new_x, new_y = ghost_position[0] + dx, ghost_position[1] + dy
+    if 0 <= new_x < GRID_WIDTH and 0 <= new_y < GRID_HEIGHT:
+        grid[ghost_position[1]][ghost_position[0]] = '.'
+        ghost_position = (new_x, new_y)
+        grid[new_y][new_x] = 'G'
 
-# Define the Pac-Man class
-class Pacman:
-    def __init__(self, start_position, start_direction):
-        self.rect = pygame.Rect(start_position[0], start_position[1], BLOCK_SIZE, BLOCK_SIZE)
-        self.direction = start_direction
-
-    def update(self):
-        # Move Pac-Man in its current direction
-        if self.direction == 'up':
-            self.rect.y -= PACMAN_SPEED
-        elif self.direction == 'down':
-            self.rect.y += PACMAN_SPEED
-        elif self.direction == 'left':
-            self.rect.x -= PACMAN_SPEED
-        elif self.direction == 'right':
-            self.rect.x += PACMAN_SPEED
-
-        # Check for collisions with walls
-        if self.rect.left < 0:
-            self.rect.left = 0
-        elif self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH
-        elif self.rect.top < 0:
-            self.rect.top = 0
-        elif self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.bottom = SCREEN_HEIGHT
-        elif self.rect.left % BLOCK_SIZE == 0 and self.rect.top % BLOCK_SIZE == 0:
-            if self.rect.left // BLOCK_SIZE < 0 or self.rect.left // BLOCK_SIZE >= len(MAZE[0]) or self.rect.top // BLOCK_SIZE < 0 or self.rect.top // BLOCK_SIZE >= len(MAZE) or MAZE[self.rect.top // BLOCK_SIZE][self.rect.left // BLOCK_SIZE] == '#' or MAZE[self.rect.bottom // BLOCK_SIZE][self.rect.right // BLOCK_SIZE] == '#' or MAZE[self.rect.top // BLOCK_SIZE][self.rect.right // BLOCK_SIZE] == '#' or MAZE[self.rect.bottom // BLOCK_SIZE][self.rect.left // BLOCK_SIZE] == '#':
-                if self.direction == 'up':
-                    self.rect.top = (self.rect.top // BLOCK_SIZE) * BLOCK_SIZE
-                elif self.direction == 'down':
-                    self.rect.bottom = ((self.rect.bottom - 1) // BLOCK_SIZE + 1) * BLOCK_SIZE
-                elif self.direction == 'left':
-                    self.rect.left = (self.rect.left // BLOCK_SIZE) * BLOCK_SIZE
-                elif self.direction == 'right':
-                    self.rect.right = ((self.rect.right - 1) // BLOCK_SIZE + 1) * BLOCK_SIZE
-
-    def draw(self):
-        pygame.draw.circle(screen, (255, 255, 0), (self.rect.centerx, self.rect.centery), BLOCK_SIZE // 2)
-
-# Create the ghosts
-ghosts = []
-for i in range(len(GHOST_COLORS)):
-    ghosts.append(Ghost(GHOST_COLORS[i], GHOST_START_POSITIONS[i]))
-
-# Create Pac-Man
-pacman = Pacman(PACMAN_START_POSITION, PACMAN_START_DIRECTION)
+def count_dots():
+    return sum(row.count('.') for row in grid)
 
 # Main game loop
 running = True
@@ -128,42 +77,32 @@ while running:
             running = False
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
-                pacman.direction = 'up'
+                move_ghost((0, -1))
             elif event.key == pygame.K_DOWN:
-                pacman.direction = 'down'
+                move_ghost((0, 1))
             elif event.key == pygame.K_LEFT:
-                pacman.direction = 'left'
+                move_ghost((-1, 0))
             elif event.key == pygame.K_RIGHT:
-                pacman.direction = 'right'
-
-    # Update the ghosts
-    for ghost in ghosts:
-        ghost.update()
+                move_ghost((1, 0))
 
     # Update Pac-Man
-    pacman.update()
+    move_pacman()
 
-    # Draw the maze
-    draw_maze()
+    # Check for collisions
+    if pacman_position == ghost_position:
+        print("You won!")
+        running = False
+    elif count_dots() == 0:
+        print("You lost!")
+        running = False
 
-    # Draw the ghosts
-    for ghost in ghosts:
-        ghost.draw()
-
-    # Draw Pac-Man
-    pacman.draw()
-
-    # Check for collisions with ghosts
-    for ghost in ghosts:
-        if pacman.rect.colliderect(ghost.rect):
-            text = font.render('Game Over', True, (255, 255, 255))
-            screen.blit(text, (SCREEN_WIDTH // 2 - text.get_width() // 2, SCREEN_HEIGHT // 2 - text.get_height() //2))
-            pygame.display.update()
-            pygame.time.wait(2000)
-            running = False
+    # Draw the grid
+    screen.fill((0, 0, 0))
+    draw_grid()
 
     # Update the screen
     pygame.display.update()
+    pygame.time.delay(200)
 
 # Clean up
 pygame.quit()
